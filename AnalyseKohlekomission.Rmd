@@ -1,0 +1,247 @@
+---
+title: "Analyse des Berichts der Kohlekommission"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Dieses HTML-Dokument enthält Informationen über die Analyse des Abschlussberichts der Kommission „Wachstum, Strukturwandel und Beschäftigung“ (Stand 26. Januar 2018).
+
+
+Der Text wurde vorher leicht bearbeitet, insbesondere wurde der Name der Kommission entfernt. Weiterhin sämtliche Füllwörter ("und", "die/der/das", etc.). Die Analyse umfasst die Seiten 1 - 129 (d.h. den Bericht ohne Anhang).
+
+
+Als Erstes berechnen wir die Worthäufigkeiten:
+
+
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+# load libs
+library("NLP")
+library("tm")
+library("SnowballC")
+library("RColorBrewer")
+library("wordcloud")
+library(corpus)
+library("ggplot2")
+
+filePath <- "Abschlussbericht_Kohlekommission.txt"
+text <- readLines(filePath)
+
+docs <- Corpus(VectorSource(text))
+
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+docs <- tm_map(docs, toSpace, "/")
+docs <- tm_map(docs, toSpace, "@")
+docs <- tm_map(docs, toSpace, "\\|")
+
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, removeWords, stopwords("german"))
+docs <- tm_map(docs, removeWords, c("sowie", "dass","dabei","vgl","bzw","mio",'mrd')) 
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, stripWhitespace)
+# Text stemming
+#docs <- tm_map(docs, stemDocument, language = "german")
+
+# Manche Plurale sollten per Hand zum Singular geändert werden
+docs <- tm_map(docs, content_transformer(function(x) gsub(x, pattern = "regionen", replacement = "region")))
+docs <- tm_map(docs, content_transformer(function(x) gsub(x, pattern = "reviere", replacement = "revier")))
+docs <- tm_map(docs, content_transformer(function(x) gsub(x, pattern = "energien", replacement = "energie")))
+docs <- tm_map(docs, content_transformer(function(x) gsub(x, pattern = "lausitzer", replacement = "lausitz")))
+docs <- tm_map(docs, content_transformer(function(x) gsub(x, pattern = "reviern", replacement = "revier")))
+
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+head(d, 100)
+w = wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          max.words=100, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+
+print(w)
+```
+
+
+Auch als Histogramm:
+
+
+```{r, echo=FALSE}
+
+p<-ggplot(data=d[1:20,], aes(x=reorder(word, freq), y=freq)) +
+  geom_bar(stat="identity") +  theme(axis.title.y=element_blank()) +   ylab("Häufigkeit")+ coord_flip()
+
+
+print(p)
+```
+
+
+Wie ist die allgemeine Verteilung der Wortarten im Text:
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+library(udpipe)
+model <- udpipe_download_model(language = "german")
+udmodel_german <- udpipe_load_model(file = 'german-gsd-ud-2.3-181115.udpipe')
+library(lattice)
+library("ggplot2", lib.loc="~/R/x86_64-pc-linux-gnu-library/3.4")
+s <- udpipe_annotate(udmodel_german, text)
+x <- data.frame(s)
+
+
+
+stats <- txt_freq(x$upos)
+stats$key <- factor(stats$key, levels = rev(stats$key))
+
+p<-ggplot(data=stats[1:30,], aes(x=reorder(key, freq), y=freq) ) +
+  geom_bar(stat="identity") +  theme(axis.title.y=element_blank()) +   ylab("Häufigkeit")+ coord_flip()
+
+p = p + theme(axis.text.x =
+                element_text(size  = 10,
+                             angle = 90,
+                             hjust = 1,
+                             vjust = 1))
+print(p)
+```
+
+Die Häufigkeit von Wörter nach Wortart. Die Nomen sind sehr ähnlich zur Wortwolke weiter oben. Allerdings wurde ein anderes Paket benutzt, daher ist das Ergebniss leicht anders, jedoch in der Tendenz ähnlich.
+
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+
+## NOUNS
+stats <- subset(x, upos %in% c("NOUN")) 
+stats <- txt_freq(stats$token)
+stats$key <- factor(stats$key, levels = rev(stats$key))
+
+stats = stats[-2,]
+
+p<-ggplot(data=stats[1:30,], aes(x=reorder(key, freq), y=freq) ) +
+  geom_bar(stat="identity") +  theme(axis.title.y=element_blank()) +   ylab("Häufigkeit Nomen")+ coord_flip()
+
+print(p)
+```
+
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+
+## ADJECTIVES
+stats <- subset(x, upos %in% c("ADJ")) 
+stats <- txt_freq(stats$token)
+stats$key <- factor(stats$key, levels = rev(stats$key))
+
+
+p<-ggplot(data=stats[1:30,], aes(x=reorder(key, freq), y=freq) ) +
+  geom_bar(stat="identity") +  theme(axis.title.y=element_blank()) +   ylab("Häufigkeit Adjektive")+ coord_flip()
+
+print(p)
+```
+
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+## Verbs
+stats <- subset(x, upos %in% c("VERB")) 
+stats <- txt_freq(stats$token)
+stats$key <- factor(stats$key, levels = rev(stats$key))
+p<-ggplot(data=stats[1:30,], aes(x=reorder(key, freq), y=freq) ) +
+  geom_bar(stat="identity") +  theme(axis.title.y=element_blank()) +   ylab("Häufigkeit Verben")+ coord_flip()
+print(p)
+```
+
+
+
+## Bigramme
+Welche zwei Wörter werden am häufigsten hintereinander genannt?
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+bigramme = term_stats(docs, ngrams = 2:3)
+bigramme = bigramme[-10,] 
+bigramme = bigramme[-8,] 
+bigramme = bigramme[-9,] 
+bigramme = bigramme[-18,] 
+p<-ggplot(data=bigramme[1:20,], aes(x=reorder(term, -count), y=count)) +
+  geom_bar(stat="identity") +  theme(axis.title.y=element_blank()) +   ylab("Häufigkeit")+ coord_flip()
+
+print(p)
+
+```
+
+Es ist auch möglich die Keywords des Textes mittels des RAKE Algorithmus zu extrahieren
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+stats <- keywords_rake(x = x, term = "lemma", group = "doc_id", 
+                       relevant = x$upos %in% c("NOUN", "ADJ","VERB","ADP"))
+stats$key <- factor(stats$keyword, levels = rev(stats$keyword))
+stats$rake[2] = stats$rake[2] +stats$rake[5]
+stats = stats[-5,]
+p<-ggplot(data=stats[1:20,], aes(x=reorder(keyword, rake), y=rake) ) +
+  geom_bar(stat="identity") +  theme(axis.title.y=element_blank()) +   ylab("Häufigkeit")+ coord_flip()
+
+print(p)
+
+```
+
+
+Ausgehend von den vorherigen Analysen lassen sich auch Graphen erstellen. Im Folgenden ist dargestellt, welche Adjektive und Nomen häufig zusammen in einem Satz vorkommen.
+
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+#udmodel_german <- udpipe_load_model(file = 'german-gsd-ud-2.3-181115.udpipe')
+#s <- udpipe_annotate(udmodel_german, text)
+#x <- data.frame(s)
+cooc <- cooccurrence(x = subset(x, upos %in% c("NOUN", "ADJ")), 
+                     term = "lemma", 
+                     group = c("doc_id", "paragraph_id", "sentence_id"))
+library(igraph)
+library(ggraph)
+library(ggplot2)
+
+wordnetwork <- head(cooc, 40)
+wordnetwork <- graph_from_data_frame(wordnetwork)
+p  = ggraph(wordnetwork) +
+  geom_edge_link(aes(width = cooc, edge_alpha = cooc), edge_colour = "blue") +
+  geom_node_text(aes(label = name), col = "black", size = 4) +
+  theme_graph(base_family = "Arial") +
+  theme(legend.position = "none") +
+  labs(title = "Cooccurrences innerhalb eines Satzes", subtitle = "Nomen & Adjektive")
+print(p)
+```
+
+## Senitment Analysis
+Eine Sentiment Analysis ermöglicht Emotionen in Texten zu erkennen. Welche Emotionen werden durch die Formulierungen im Bericht angesprochen?
+
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+library(syuzhet)
+
+my_text <- get_text_as_string(filePath)
+char_v <- get_sentences(my_text)
+method <- "nrc"
+lang <- "german"
+my_text_values <- get_sentiment(char_v, method=method, language=lang)
+library(ggplot2)
+result <- get_nrc_sentiment(as.character(char_v), language=lang)
+result1<-data.frame(t(result))
+new_result <- data.frame(rowSums(result1))
+names(new_result)[1] <- "count"
+new_result <- cbind("sentiment" = rownames(new_result), new_result)
+rownames(new_result) <- NULL
+print(
+qplot(sentiment, data=new_result[1:8,], weight=count, geom="bar",fill=sentiment)+ggtitle("Koko Sentiments")+ theme(legend.position="none") +   theme(axis.title.y=element_blank(),                                      axis.text.y=element_blank(),axis.ticks.y=element_blank())
+)
+```
+
+
+Wie ist die allgemeine Stimmung im Text?
+
+
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+print(qplot(sentiment, data=new_result[9:10,], weight=count, geom="bar",fill=sentiment)+ggtitle("Koko Sentiments"))
+```
+
+
+Wie entwickelt sich die Stimmung im Verlaufe des Textes? Dies ist insbesondere interessant, wenn die Analyse mit den entsprechenden Themen des Inhaltsverzeichnisses verglichen wird: S. 1-67 Ausgangslage (Klimapolitisch, Energiewirtschaftlich, Wachstum & Beschäftigung, Strukturpolitisch, Rechtliches), S. 70-80 Klimaschutz, S. 82-125 Perspektiven.
+```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
+# Plot overall Emotional Valance over time
+dct_values <- get_dct_transform(
+  my_text_values, 
+  low_pass_size = 5, 
+  x_reverse_len = 100,
+  scale_vals = F,
+  scale_range = T
+)
+print(qplot(x=seq(1,125, length.out=100), y=dct_values,  xlab = "Page", ylab = "Emotional Valence"))
+```
