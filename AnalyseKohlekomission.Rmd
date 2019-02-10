@@ -155,7 +155,7 @@ bigramme = bigramme[-10,]
 bigramme = bigramme[-8,] 
 bigramme = bigramme[-9,] 
 bigramme = bigramme[-18,] 
-p<-ggplot(data=bigramme[1:20,], aes(x=reorder(term, -count), y=count)) +
+p<-ggplot(data=bigramme[1:20,], aes(x=reorder(term, count), y=count)) +
   geom_bar(stat="identity") +  theme(axis.title.y=element_blank()) +   ylab("Häufigkeit")+ coord_flip()
 
 print(p)
@@ -234,6 +234,7 @@ print(qplot(sentiment, data=new_result[9:10,], weight=count, geom="bar",fill=sen
 
 
 Wie entwickelt sich die Stimmung im Verlaufe des Textes? Dies ist insbesondere interessant, wenn die Analyse mit den entsprechenden Themen des Inhaltsverzeichnisses verglichen wird: S. 1-67 Ausgangslage (Klimapolitisch, Energiewirtschaftlich, Wachstum & Beschäftigung, Strukturpolitisch, Rechtliches), S. 70-80 Klimaschutz, S. 82-125 Perspektiven.
+
 ```{r, echo=FALSE,results='hide',fig.keep='all',message=FALSE, warning=FALSE}
 # Plot overall Emotional Valance over time
 dct_values <- get_dct_transform(
